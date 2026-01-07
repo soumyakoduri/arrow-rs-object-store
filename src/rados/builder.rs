@@ -73,6 +73,10 @@ pub struct RadosBuilder {
     pool_name: Option<String>,
     /// Optional namespace within the pool
     namespace: Option<String>,
+    /// Path to keyring file for authentication
+    keyring: Option<String>,
+    /// Authentication key (alternative to keyring file)
+    key: Option<String>,
 }
 
 /// Configuration keys for [`RadosBuilder`]
@@ -137,6 +141,24 @@ pub enum RadosConfigKey {
     /// - `ceph_namespace`
     Namespace,
 
+    /// Path to keyring file
+    ///
+    /// See [`RadosBuilder::with_keyring`] for details.
+    ///
+    /// Supported keys:
+    /// - `keyring`
+    /// - `ceph_keyring`
+    Keyring,
+
+    /// Authentication key
+    ///
+    /// See [`RadosBuilder::with_key`] for details.
+    ///
+    /// Supported keys:
+    /// - `key`
+    /// - `ceph_key`
+    Key,
+
     /// Client configuration
     Client(crate::ClientConfigKey),
 }
@@ -149,6 +171,8 @@ impl AsRef<str> for RadosConfigKey {
             Self::ConfFile => "conf_file",
             Self::PoolName => "pool_name",
             Self::Namespace => "namespace",
+            Self::Keyring => "keyring",
+            Self::Key => "key",
             Self::Client(key) => key.as_ref(),
         }
     }
@@ -164,6 +188,8 @@ impl FromStr for RadosConfigKey {
             "conf_file" | "ceph_conf" | "ceph_conf_file" => Ok(Self::ConfFile),
             "pool" | "pool_name" | "ceph_pool" => Ok(Self::PoolName),
             "namespace" | "ceph_namespace" => Ok(Self::Namespace),
+            "keyring" | "ceph_keyring" => Ok(Self::Keyring),
+            "key" | "ceph_key" => Ok(Self::Key),
             _ => match s.parse() {
                 Ok(key) => Ok(Self::Client(key)),
                 Err(_) => Err(Error::UnknownConfigurationKey {
@@ -218,6 +244,47 @@ impl RadosBuilder {
         self
     }
 
+    /// Set the path to the keyring file for authentication
+    ///
+    /// If not specified, librados will use default keyring locations:
+    /// - /etc/ceph/ceph.client.<user>.keyring
+    /// - /etc/ceph/keyring
+    /// - ~/.ceph/keyring
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use object_store::rados::RadosBuilder;
+    /// let rados = RadosBuilder::new()
+    ///     .with_pool_name("my-pool")
+    ///     .with_user_name("client.myapp")
+    ///     .with_keyring("/etc/ceph/ceph.client.myapp.keyring")
+    ///     .build();
+    /// ```
+    pub fn with_keyring(mut self, keyring: impl Into<String>) -> Self {
+        self.keyring = Some(keyring.into());
+        self
+    }
+
+    /// Set the authentication key directly (base64 encoded)
+    ///
+    /// This is an alternative to using a keyring file. Useful for
+    /// programmatic access or when credentials are stored in environment
+    /// variables or secrets management systems.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use object_store::rados::RadosBuilder;
+    /// let rados = RadosBuilder::new()
+    ///     .with_pool_name("my-pool")
+    ///     .with_user_name("client.myapp")
+    ///     .with_key("AQCvCbtToC6MDhAATtuT70Sl+DymPCfDSsyV4w==")
+    ///     .build();
+    /// ```
+    pub fn with_key(mut self, key: impl Into<String>) -> Self {
+        self.key = Some(key.into());
+        self
+    }
+
     /// Set a configuration option using a key-value pair
     pub fn with_config(mut self, key: RadosConfigKey, value: impl Into<String>) -> Self {
         match key {
@@ -226,6 +293,8 @@ impl RadosBuilder {
             RadosConfigKey::ConfFile => self.conf_file = Some(value.into()),
             RadosConfigKey::PoolName => self.pool_name = Some(value.into()),
             RadosConfigKey::Namespace => self.namespace = Some(value.into()),
+            RadosConfigKey::Keyring => self.keyring = Some(value.into()),
+            RadosConfigKey::Key => self.key = Some(value.into()),
             RadosConfigKey::Client(_key) => {
                 // Client configuration would be handled here
                 // For now, we'll skip it as we don't have ClientOptions yet
@@ -244,6 +313,8 @@ impl RadosBuilder {
             self.conf_file,
             pool_name,
             self.namespace,
+            self.keyring,
+            self.key,
         )?;
 
         Ok(CephRados::new(Arc::new(client)))
@@ -257,6 +328,8 @@ impl RadosBuilder {
     /// - `CEPH_CONF`: Configuration file path
     /// - `CEPH_POOL`: Pool name
     /// - `CEPH_NAMESPACE`: Namespace
+    /// - `CEPH_KEYRING`: Path to keyring file
+    /// - `CEPH_KEY`: Authentication key (base64 encoded)
     pub fn from_env() -> Self {
         let mut builder = Self::new();
 
@@ -278,6 +351,14 @@ impl RadosBuilder {
 
         if let Ok(namespace) = std::env::var("CEPH_NAMESPACE") {
             builder = builder.with_namespace(namespace);
+        }
+
+        if let Ok(keyring) = std::env::var("CEPH_KEYRING") {
+            builder = builder.with_keyring(keyring);
+        }
+
+        if let Ok(key) = std::env::var("CEPH_KEY") {
+            builder = builder.with_key(key);
         }
 
         builder

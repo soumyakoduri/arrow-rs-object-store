@@ -46,11 +46,13 @@ use crate::{
 
 mod builder;
 mod client;
+mod multipart;
 
 #[cfg(test)]
 mod tests;
 
 pub use builder::{RadosBuilder, RadosConfigKey};
+pub(crate) use multipart::RadosMultipartUpload;
 
 const STORE: &str = "RADOS";
 

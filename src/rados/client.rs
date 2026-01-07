@@ -19,7 +19,7 @@ use bytes::Bytes;
 use futures::stream::{BoxStream, StreamExt};
 use tokio::task;
 
-use crate::rados::STORE;
+use crate::rados::{RadosMultipartUpload, STORE};
 use crate::{
     Error, GetOptions, GetResult, GetResultPayload, ListResult, MultipartId, MultipartUpload,
     ObjectMeta, Path, PutMode, PutMultipartOptions, PutOptions, PutPayload, PutResult, Result,
@@ -34,6 +34,8 @@ pub struct RadosClient {
     conf_file: Option<String>,
     pool_name: String,
     namespace: Option<String>,
+    keyring: Option<String>,
+    key: Option<String>,
 }
 
 impl RadosClient {
@@ -44,6 +46,8 @@ impl RadosClient {
         conf_file: Option<String>,
         pool_name: String,
         namespace: Option<String>,
+        keyring: Option<String>,
+        key: Option<String>,
     ) -> Result<Self> {
         Ok(Self {
             cluster_name,
@@ -51,6 +55,8 @@ impl RadosClient {
             conf_file,
             pool_name,
             namespace,
+            keyring,
+            key,
         })
     }
 
@@ -88,11 +94,15 @@ impl RadosClient {
             // The actual implementation would:
             // 1. Create a cluster handle: rados_create(&cluster, user_name)
             // 2. Read config: rados_conf_read_file(cluster, conf_file)
-            // 3. Connect: rados_connect(cluster)
-            // 4. Create IO context: rados_ioctx_create(cluster, pool_name, &io)
-            // 5. Set namespace if needed: rados_ioctx_set_namespace(io, namespace)
-            // 6. Write object: rados_write_full(io, object_name, data, len)
-            // 7. Cleanup: rados_ioctx_destroy(io); rados_shutdown(cluster)
+            // 3. Configure credentials:
+            //    - If keyring path provided: rados_conf_set(cluster, "keyring", keyring_path)
+            //    - If key provided: rados_conf_set(cluster, "key", key)
+            //    - Otherwise librados uses default keyring locations
+            // 4. Connect: rados_connect(cluster)
+            // 5. Create IO context: rados_ioctx_create(cluster, pool_name, &io)
+            // 6. Set namespace if needed: rados_ioctx_set_namespace(io, namespace)
+            // 7. Write object: rados_write_full(io, object_name, data, len)
+            // 8. Cleanup: rados_ioctx_destroy(io); rados_shutdown(cluster)
 
             // Placeholder implementation
             let object_name = location.as_ref();
@@ -273,19 +283,21 @@ impl RadosClient {
     /// Initialize multipart upload
     pub async fn put_multipart_opts(
         &self,
-        _location: &Path,
+        location: &Path,
         _opts: PutMultipartOptions,
     ) -> Result<Box<dyn MultipartUpload>> {
-        // TODO: Implement multipart upload
-        //
-        // RADOS doesn't have native multipart upload, but we can implement it:
-        // 1. Create temporary objects for each part
-        // 2. On complete, concatenate parts into final object
-        // 3. On abort, delete temporary parts
+        // Create a new multipart upload session
+        let upload = RadosMultipartUpload::new(
+            location.clone(),
+            self.pool_name.clone(),
+            self.namespace.clone(),
+            self.cluster_name.clone(),
+            self.user_name.clone(),
+            self.conf_file.clone(),
+            self.keyring.clone(),
+            self.key.clone(),
+        );
 
-        Err(Error::NotImplemented {
-            operation: "multipart upload".into(),
-            implementer: STORE.into(),
-        })
+        Ok(Box::new(upload))
     }
 }
