@@ -81,7 +81,8 @@ fs = ["walkdir"]
 gcp = ["cloud", "rustls-pki-types"]
 aws = ["cloud", "md-5"]
 http = ["cloud"]
-rados = ["ceph", "uuid"]
+rados = ["ceph", "uuid"]  # Raw RADOS backend via librados
+rgw-sal = ["ceph", "uuid"]  # RGW Storage Abstraction Layer backend (requires C++ and librgw)
 tls-webpki-roots = ["reqwest?/rustls-tls-webpki-roots"]
 integration = ["rand"]
 
