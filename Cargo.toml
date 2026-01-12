@@ -82,7 +82,7 @@ gcp = ["cloud", "rustls-pki-types"]
 aws = ["cloud", "md-5"]
 http = ["cloud"]
 rados = ["ceph", "uuid"]  # Raw RADOS backend via librados
-rgw-sal = ["ceph", "uuid"]  # RGW Storage Abstraction Layer backend (requires C++ and librgw)
+rgw-sal = ["uuid", "cc"]  # RGW Storage Abstraction Layer backend (requires C++ and librgw)
 tls-webpki-roots = ["reqwest?/rustls-tls-webpki-roots"]
 integration = ["rand"]
 
@@ -107,6 +107,9 @@ features = ["wasm_js"]
 package = "getrandom"
 version = "0.2"
 features = ["js"]
+
+[build-dependencies]
+cc = { version = "1.0", optional = true }
 
 [[test]]
 name = "get_range_file"
