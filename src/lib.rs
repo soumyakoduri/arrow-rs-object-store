@@ -95,6 +95,14 @@
     feature = "http",
     doc = "* [`http`]: [HTTP/WebDAV Storage](https://datatracker.ietf.org/doc/html/rfc2518). See [`HttpBuilder`](http::HttpBuilder)"
 )]
+#![cfg_attr(
+    feature = "rados",
+    doc = "* [`rados`]: [Ceph RADOS](https://docs.ceph.com/en/latest/rados/). See [`RadosBuilder`](rados::RadosBuilder)"
+)]
+#![cfg_attr(
+    feature = "rgw-sal",
+    doc = "* [`rgw_sal`]: [Ceph RGW via SAL](https://docs.ceph.com/en/latest/radosgw/). See [`RgwSalBuilder`](rgw_sal::RgwSalBuilder)"
+)]
 //!
 //! # Why not a Filesystem Interface?
 //!
@@ -548,6 +556,11 @@ pub mod gcp;
 #[cfg(feature = "http")]
 pub mod http;
 pub mod limit;
+#[cfg(feature = "rados")]
+pub mod rados;
+
+#[cfg(feature = "rgw-sal")]
+pub mod rgw_sal;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 pub mod local;
 pub mod memory;

@@ -62,6 +62,10 @@ serde_json = { version = "1.0", default-features = false, features = ["std"], op
 serde_urlencoded = { version = "0.7", optional = true }
 tokio = { version = "1.29.0", features = ["sync", "macros", "rt", "time", "io-util"] }
 
+# Ceph RADOS support
+ceph = { version = "3.1.0", optional = true }
+uuid = { version = "1.7.0", features = ["v4"], optional = true }
+
 [target.'cfg(target_family="unix")'.dev-dependencies]
 nix = { version = "0.30.0", features = ["fs"] }
 
@@ -77,6 +81,8 @@ fs = ["walkdir"]
 gcp = ["cloud", "rustls-pki-types"]
 aws = ["cloud", "md-5"]
 http = ["cloud"]
+rados = ["ceph", "uuid"]  # Raw RADOS backend via librados
+rgw-sal = ["ceph", "uuid"]  # RGW Storage Abstraction Layer backend (requires C++ and librgw)
 tls-webpki-roots = ["reqwest?/rustls-tls-webpki-roots"]
 integration = ["rand"]
 
