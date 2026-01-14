@@ -554,6 +554,8 @@ pub mod http;
 pub mod limit;
 #[cfg(feature = "rados")]
 pub mod rados;
+#[cfg(feature = "rgw-sal")]
+pub mod rgw_sal;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 pub mod local;
 pub mod memory;

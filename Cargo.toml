@@ -64,6 +64,7 @@ tokio = { version = "1.29.0", features = ["sync", "macros", "rt", "time", "io-ut
 
 # Ceph RADOS support
 ceph = { version = "3.1.0", optional = true }
+uuid = { version = "1.7.0", features = ["v4"], optional = true }
 
 [target.'cfg(target_family="unix")'.dev-dependencies]
 nix = { version = "0.30.0", features = ["fs"] }
@@ -71,6 +72,9 @@ nix = { version = "0.30.0", features = ["fs"] }
 [target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
 web-time = { version = "1.1.0" }
 wasm-bindgen-futures = "0.4.18"
+
+[build-dependencies]
+cc = { version = "1.0", optional = true }
 
 [features]
 default = ["fs"]
@@ -81,6 +85,7 @@ gcp = ["cloud", "rustls-pki-types"]
 aws = ["cloud", "md-5"]
 http = ["cloud"]
 rados = ["ceph"]
+rgw-sal = ["uuid", "cc"]
 tls-webpki-roots = ["reqwest?/rustls-tls-webpki-roots"]
 integration = ["rand"]
 
