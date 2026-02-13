@@ -16,26 +16,33 @@
 // under the License.
 
 fn main() {
-    #[cfg(feature = "rgw-sal")]
-    build_rgw_sal();
+    #[cfg(feature = "unified-sal")]
+    build_unified_sal();
 }
 
-#[cfg(feature = "rgw-sal")]
-fn build_rgw_sal() {
+#[cfg(feature = "unified-sal")]
+fn build_unified_sal() {
     use std::env;
     use std::path::PathBuf;
 
-    println!("cargo:rerun-if-changed=cpp/rgw_sal_wrapper.cpp");
+    // Ceph source location
+    let ceph_src = "../ceph/src";
+    let unified_header = format!("{}/include/rgw/rgw_sal_unified.h", ceph_src);
+    let unified_impl = format!("{}/rgw/rgw_sal_unified.cc", ceph_src);
 
-    // Compile the C++ wrapper
+    println!("cargo:rerun-if-changed={}", unified_header);
+    println!("cargo:rerun-if-changed={}", unified_impl);
+
+    // Compile the unified C API from Ceph repo
     cc::Build::new()
         .cpp(true)
-        .file("cpp/rgw_sal_wrapper.cpp")
+        .file(&unified_impl)
         .flag("-std=c++17")
         .include("/usr/include/ceph")
         .include("/usr/include")
+        .include(format!("{}/include", ceph_src)) // Ceph include directory
         .warnings(false) // Suppress warnings from Ceph headers
-        .compile("rgw_sal_wrapper");
+        .compile("sal_unified");
 
     // Link against librados and librgw
     println!("cargo:rustc-link-lib=rados");
@@ -54,8 +61,8 @@ fn build_rgw_sal() {
     }
 }
 
-#[cfg(feature = "rgw-sal")]
-mod build_dependencies {
-    // This ensures cc crate is available when rgw-sal feature is enabled
+#[cfg(feature = "unified-sal")]
+mod build_dependencies_unified {
+    // This ensures cc crate is available when unified-sal feature is enabled
     extern crate cc;
 }

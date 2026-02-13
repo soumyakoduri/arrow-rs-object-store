@@ -32,26 +32,26 @@
 //! # Example
 //!
 //! ```no_run
-//! use object_store::rgw_sal::SalBuilder;
+//! use object_store::rgw_sal::SalClient;
 //! use object_store::{ObjectStore, Path};
 //! use bytes::Bytes;
 //!
 //! # async fn example() -> object_store::Result<()> {
-//! // Create SAL object store
-//! let store = SalBuilder::new()
-//!     .with_cluster_name("ceph")
-//!     .with_user_name("admin")
-//!     .with_conf_file("/etc/ceph/ceph.conf")
-//!     .with_bucket("my-bucket")
-//!     .build()?;
+//! // Create SAL client
+//! let client = SalClient::new(
+//!     "ceph".to_string(),                          // cluster name
+//!     "admin".to_string(),                         // user name
+//!     Some("/etc/ceph/ceph.conf".to_string()),     // config file
+//!     "my-bucket".to_string(),                     // bucket name
+//! )?;
 //!
 //! // Put an object
 //! let path = Path::from("test.txt");
 //! let data = Bytes::from("Hello, SAL!");
-//! store.put(&path, data.into()).await?;
+//! client.put(&path, data.into()).await?;
 //!
 //! // Get the object
-//! let result = store.get(&path).await?;
+//! let result = client.get(&path).await?;
 //! let bytes = result.bytes().await?;
 //! # Ok(())
 //! # }
@@ -59,67 +59,35 @@
 //!
 //! # Authentication
 //!
-//! The SAL backend supports multiple authentication methods:
-//!
-//! ## Using configuration file and keyring:
+//! The SAL backend uses Ceph configuration for authentication:
 //!
 //! ```no_run
-//! # use object_store::rgw_sal::SalBuilder;
+//! # use object_store::rgw_sal::SalClient;
 //! # async fn example() -> object_store::Result<()> {
-//! let store = SalBuilder::new()
-//!     .with_bucket("my-bucket")
-//!     .with_conf_file("/etc/ceph/ceph.conf")
-//!     .with_keyring("/etc/ceph/ceph.client.admin.keyring")
-//!     .build()?;
+//! let client = SalClient::new(
+//!     "ceph".to_string(),
+//!     "admin".to_string(),
+//!     Some("/etc/ceph/ceph.conf".to_string()),
+//!     "my-bucket".to_string(),
+//! )?;
 //! # Ok(())
 //! # }
 //! ```
 //!
-//! ## Using environment variables:
-//!
-//! ```bash
-//! export CEPH_CLUSTER_NAME=ceph
-//! export CEPH_USER_NAME=admin
-//! export CEPH_CONF_FILE=/etc/ceph/ceph.conf
-//! export CEPH_BUCKET_NAME=my-bucket
-//! ```
-//!
-//! ```no_run
-//! # use object_store::rgw_sal::SalBuilder;
-//! # async fn example() -> object_store::Result<()> {
-//! let store = SalBuilder::from_env()?.build()?;
-//! # Ok(())
-//! # }
-//! ```
-//!
-//! ## Using URL:
-//!
-//! ```no_run
-//! # use object_store::rgw_sal::SalBuilder;
-//! # use url::Url;
-//! # async fn example() -> object_store::Result<()> {
-//! // Basic: sal://bucket-name
-//! let url = Url::parse("sal://my-bucket")?;
-//! let store = SalBuilder::from_url(&url)?.build()?;
-//!
-//! // With parameters: sal://bucket?user=admin&conf=/etc/ceph/ceph.conf
-//! let url = Url::parse("sal://my-bucket?user=admin&conf=/etc/ceph/ceph.conf")?;
-//! let store = SalBuilder::from_url(&url)?.build()?;
-//! # Ok(())
-//! # }
-//! ```
+//! The configuration file and keyring follow standard Ceph conventions.
+//! Authentication is handled by the underlying Ceph libraries.
 //!
 //! # Multipart Upload
 //!
 //! The SAL backend provides native S3-compatible multipart upload:
 //!
 //! ```no_run
-//! # use object_store::rgw_sal::SalBuilder;
+//! # use object_store::rgw_sal::SalClient;
 //! # use object_store::{ObjectStore, Path};
 //! # async fn example() -> object_store::Result<()> {
-//! # let store = SalBuilder::new().with_bucket("test").build()?;
+//! # let client = SalClient::new("ceph".into(), "admin".into(), None, "test".into())?;
 //! let path = Path::from("large-file.bin");
-//! let mut upload = store.put_multipart(&path).await?;
+//! let mut upload = client.put_multipart(&path).await?;
 //!
 //! // Upload parts (minimum 5MB per part except last)
 //! for i in 0..10 {
@@ -135,25 +103,26 @@
 //!
 //! # Architecture
 //!
-//! The SAL backend consists of multiple layers:
+//! The SAL backend uses a TRUE 1-1 mapping architecture:
 //!
 //! ```text
 //! ┌─────────────────────────────────┐
 //! │  ObjectStore Trait (Rust)       │
 //! └────────────┬────────────────────┘
-//!              │
+//!              │ Each method = 1 call
 //!              ▼
 //! ┌─────────────────────────────────┐
-//! │  SalObjectStore                 │
-//! │  - Builder, Client, Multipart   │
+//! │  SalClient (client_v2.rs)       │
+//! │  - Thin async wrapper           │
 //! └────────────┬────────────────────┘
-//!              │ (Rust FFI)
+//!              │ 1 FFI call per method
 //!              ▼
 //! ┌─────────────────────────────────┐
-//! │  C++ Wrapper                    │
-//! │  - FFI-compatible functions     │
+//! │  Unified C API (Ceph repo)      │
+//! │  - rgw_sal_unified.h/.cc        │
+//! │  - ALL business logic here      │
 //! └────────────┬────────────────────┘
-//!              │ (C++ calls)
+//!              │ Internal C++ calls
 //!              ▼
 //! ┌─────────────────────────────────┐
 //! │  RGW SAL C++ API                │
@@ -168,9 +137,10 @@
 //!
 //! # Requirements
 //!
+//! - Ceph repository at `../ceph` (for building unified C API)
 //! - Ceph development libraries (librados-dev, librgw-dev)
 //! - C++17 compiler
-//! - Build with `rgw-sal` feature enabled
+//! - Build with `unified-sal` feature enabled
 //!
 //! # Comparison with RADOS Backend
 //!
@@ -183,24 +153,11 @@
 //! | Performance | ~20% faster | Battle-tested |
 //! | Dependencies | librados (C) | librados + librgw (C++) |
 
-mod builder;
-mod client;
-mod ffi;
-mod multipart;
+// Unified SAL implementation with TRUE 1-1 mapping
+mod ffi_v2;
+mod client_v2;
 
-pub use builder::{SalBuilder, SalObjectStore};
+pub use client_v2::SalClient;
 
 // Re-export commonly used types for convenience
 pub use crate::{Error, ObjectStore, Path, Result};
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_module_exports() {
-        // Ensure all public types are accessible
-        let _builder: SalBuilder;
-        let _store: Option<SalObjectStore> = None;
-    }
-}
