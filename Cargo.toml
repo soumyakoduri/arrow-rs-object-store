@@ -76,6 +76,7 @@ fs = ["walkdir"]
 gcp = ["cloud", "rustls-pemfile"]
 aws = ["cloud", "md-5"]
 http = ["cloud"]
+rgw = []  # RGW (RADOS Gateway) backend using SAL C API
 tls-webpki-roots = ["reqwest?/rustls-tls-webpki-roots"]
 integration = ["rand"]
 
